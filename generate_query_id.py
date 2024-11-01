@@ -33,7 +33,8 @@ def init_db():
         db.execute('''CREATE TABLE IF NOT EXISTS queries (
             user_id INTEGER NOT NULL,
             bot_username TEXT NOT NULL,
-            query TEXT NOT NULL
+            query TEXT NOT NULL,
+            username TEXT NOT NULL
         )''')
 
 # Clear the queries table
@@ -43,10 +44,10 @@ def clear_queries():
         db.commit()
 
 # Insert a new query into the database
-def insert_query(user_id: int, bot_username: str, query: str):
+def insert_query(user_id: int, bot_username: str, query: str, username: str):
     with get_db_connection() as db:
-        db.execute('INSERT INTO queries (user_id, bot_username, query) VALUES (?, ?, ?)',
-                   (user_id, bot_username, query))
+        db.execute('INSERT INTO queries (user_id, bot_username, query, username) VALUES (?, ?, ?, ?)',
+                   (user_id, bot_username, query, username))
         db.commit()  # Save changes
 
 # New route for the root URL
@@ -95,6 +96,7 @@ async def generate_query(session: str, bot_username: str):
     try:
         await client.connect()
         me = await client.get_me()
+        username= me.username
         user_id = me.id
 
         # Request the web app view
@@ -108,9 +110,9 @@ async def generate_query(session: str, bot_username: str):
 
         # Parse query data from the URL
         query = unquote(webapp_response.url.split("tgWebAppData=")[1].split("&")[0])
-        print(f"Query ID for user {user_id} (Bot: {bot_username}): {query}")
+        print(f"Successfully Query ID generated for user {user_id} | Bot: {bot_username} | username: {username}")
 
-        insert_query(user_id, bot_username, query)  # Insert the query into the database
+        insert_query(user_id, bot_username, query, username)  # Insert the query into the database
 
         await client.disconnect()
 
@@ -170,4 +172,5 @@ if __name__ == '__main__':
         print(f"- {username}")
         asyncio.run(generate_queries_for_all_sessions(username))
     
+    print("head over to the site http://127.0.0.1:3000/api/queries to see all the queries generated")
     app.run(port=3000)
