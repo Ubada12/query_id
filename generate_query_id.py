@@ -2,7 +2,7 @@ import os
 import re
 import sqlite3
 import asyncio
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from urllib.parse import unquote
 from telethon import TelegramClient
@@ -43,6 +43,11 @@ def clear_queries():
         db.execute('DELETE FROM queries')
         db.commit()
 
+def clear_queries_for_specific(bot_name):
+    with get_db_connection() as db:
+        db.execute('DELETE FROM queries WHERE bot_username = ?', (bot_name,))
+        db.commit()
+
 # Insert a new query into the database
 def insert_query(user_id: int, bot_username: str, query: str, username: str):
     with get_db_connection() as db:
@@ -72,6 +77,30 @@ def get_queries():
         queries = db.execute('SELECT * FROM queries').fetchall()
         print("Database accessed: queries refreshed")  # Log to console on each access
         return jsonify({'queries': [dict(row) for row in queries]})
+
+def refresh_query_for_bot(bot_name):
+    print(f"Refreshing query for bot: {bot_name}")
+    clear_queries_for_specific(bot_name)  # Clear bot queries before inserting new ones
+    print(f"Generating new query IDs for the {bot_name} bot:")
+    asyncio.run(generate_queries_for_all_sessions(bot_name))
+    
+    # Fetch and return the updated queries
+    with get_db_connection() as db:
+        queries = db.execute('SELECT * FROM queries WHERE bot_username = ?', (bot_name,)).fetchall()
+        print("Database accessed: queries refreshed")  # Log to console on each access
+        return {'queries': [dict(row) for row in queries]}  # Return the queries in the expected format
+
+# Route to refresh a specific query for a mini-app
+@app.route('/api/refresh/query', methods=['GET'])
+def refresh_query():
+    bot_name = request.args.get('bot')  # Get the bot name from the query parameters
+    if not bot_name:
+        return jsonify({"error": "Bot name is required."}), 400  # Return error if bot name is missing
+
+    # Call the function to refresh the query for the specified bot
+    queries = refresh_query_for_bot(bot_name)
+    
+    return jsonify({"status": "Query refreshed successfully for bot: " + bot_name, **queries})
 
 def validate_usernames(usernames):
     # Regex to check that each username contains only valid Telegram characters and is separated by commas
