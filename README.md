@@ -2,6 +2,7 @@
 
 1) Install Required Libraries 📦
    First, ensure you have all the necessary libraries by running the following command in your terminal:
+   
    `pip install -r requirements.txt`
 
 3) Edit the .env File 📝
@@ -23,6 +24,7 @@
 
 6) Run the Bot 🚀
    Once everything is set up, execute the following command to start the bot:
+   
    `python menu.py`
    
 🎉 That's it! Enjoy using your Query ID Extractor Bot! 🎉
