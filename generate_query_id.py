@@ -34,7 +34,7 @@ def init_db():
             user_id INTEGER NOT NULL,
             bot_username TEXT NOT NULL,
             query TEXT NOT NULL,
-            username TEXT NOT NULL
+            name TEXT NOT NULL
         )''')
 
 # Clear the queries table
@@ -49,10 +49,10 @@ def clear_queries_for_specific(bot_name):
         db.commit()
 
 # Insert a new query into the database
-def insert_query(user_id: int, bot_username: str, query: str, username: str):
+def insert_query(user_id: int, bot_username: str, query: str, name: str):
     with get_db_connection() as db:
-        db.execute('INSERT INTO queries (user_id, bot_username, query, username) VALUES (?, ?, ?, ?)',
-                   (user_id, bot_username, query, username))
+        db.execute('INSERT INTO queries (user_id, bot_username, query, name) VALUES (?, ?, ?, ?)',
+                   (user_id, bot_username, query, name))
         db.commit()  # Save changes
 
 # New route for the root URL
@@ -102,20 +102,6 @@ def refresh_query():
     
     return jsonify({"status": "Query refreshed successfully for bot: " + bot_name, **queries})
 
-def validate_usernames(usernames):
-    # Regex to check that each username contains only valid Telegram characters and is separated by commas
-    return re.match(r'^([a-zA-Z0-9_]+)(, *[a-zA-Z0-9_]+)*$', usernames)
-
-def get_usernames():
-    global usernames  # Declare usernames as global
-    while True:
-        usernames_input = input("Enter bot usernames in the format 'username1, username2': ")
-        if validate_usernames(usernames_input):
-            usernames = [username.strip() for username in usernames_input.split(",")]
-            return usernames
-        else:
-            print("Error: Please enter usernames in the correct format (e.g., 'username1, username2').")
-
 # Function to generate query ID for a single session string
 async def generate_query(session: str, bot_username: str):
     global api_id, api_hash  # Access the global variables
@@ -125,7 +111,7 @@ async def generate_query(session: str, bot_username: str):
     try:
         await client.connect()
         me = await client.get_me()
-        username= me.username
+        name = me.first_name + " " + (me.last_name if me.last_name else "")
         user_id = me.id
 
         # Request the web app view
@@ -139,9 +125,9 @@ async def generate_query(session: str, bot_username: str):
 
         # Parse query data from the URL
         query = unquote(webapp_response.url.split("tgWebAppData=")[1].split("&")[0])
-        print(f"Successfully Query ID generated for user {user_id} | Bot: {bot_username} | username: {username}")
+        print(f"Successfully Query ID generated for user {name} | Bot: {bot_username} | username: {username}")
 
-        insert_query(user_id, bot_username, query, username)  # Insert the query into the database
+        insert_query(user_id, bot_username, query, name)  # Insert the query into the database
 
         await client.disconnect()
 
@@ -179,6 +165,7 @@ if __name__ == '__main__':
 
     api_id = os.getenv('API_ID')
     api_hash = os.getenv('API_HASH')
+    usernames_str = os.getenv('BOT_USERNAMES')
 
     if api_id is None or api_hash is None:
         print("Error: API_ID and API_HASH must be set in the .env file.")
@@ -193,9 +180,19 @@ if __name__ == '__main__':
     except ValueError:
         print("Error: API_ID must be an integer.")
         exit(1)
+
+    # Validate BOT_USERNAMES
+    if usernames_str is None:
+        print("Error: BOT_USERNAMES must be set in the .env file.")
+        exit(1)
+
+    usernames = [username.strip() for username in usernames_str.split(",") if username.strip()]
+    
+    if not usernames:
+        print("Error: BOT_USERNAMES cannot be empty.")
+        exit(1)
     
     init_db()  # Initialize the database once at startup
-    get_usernames()  # Prompt for usernames and assign to global variable
     print("Generating query IDs for the following usernames:")
     for username in usernames:
         print(f"- {username}")
