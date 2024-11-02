@@ -126,6 +126,7 @@ async def generate_query(session: str, bot_username: str):
         # Parse query data from the URL
         query = unquote(webapp_response.url.split("tgWebAppData=")[1].split("&")[0])
         print(f"Successfully Query ID generated for user {name} | Bot: {bot_username} | username: {username}")
+        print()
 
         insert_query(user_id, bot_username, query, name)  # Insert the query into the database
 
@@ -139,7 +140,7 @@ async def generate_query(session: str, bot_username: str):
     except Exception as e:
         await client.disconnect()
         print(f"Error while generating query: {e}")
-        return None
+        exit(1)
 
 # Function to load session strings from the 'sessions' folder and generate queries
 async def generate_queries_for_all_sessions(bot_username: str):
