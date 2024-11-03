@@ -124,12 +124,12 @@ def get_queries():
         if userid and not bot_name:
             if not check_whether_userid_present_or_not(userid):
                 return jsonify({'error': 'User ID not found'}), 404  # Return a JSON response with a 404 error
-            if not check_whether_botname_present_or_not(bot_name):
-                return jsonify({'error': 'Bot Name not found'}), 404  # Return a JSON response with a 404 error
             queries = db.execute('SELECT * FROM queries WHERE user_id = ?', (userid,)).fetchall()
         
         # Case 2: Only 'bot' is provided
         elif bot_name and not userid:
+            if not check_whether_botname_present_or_not(bot_name):
+                return jsonify({'error': 'Bot Name not found'}), 404  # Return a JSON response with a 404 error
             queries = db.execute('SELECT * FROM queries WHERE bot_username = ?', (bot_name,)).fetchall()
         
         # Case 3: Both 'userid' and 'bot' are provided
