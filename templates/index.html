@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Queries API Documentation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        h2 {
+            color: #007bff;
+        }
+        p {
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        ol {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        code {
+            background-color: #e9ecef;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        footer {
+            margin-top: 20px;
+            text-align: center;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Welcome to the Queries API!</h1>
+    <p>Use the following endpoints to fetch or refresh the queries:</p>
+
+    <h2>Fetch Endpoints:</h2>
+    <ol>
+        <li><strong>Get all queries from the database</strong><br>
+            <code>GET /api/getAll/query</code>
+        </li>
+        <li><strong>Get all queries with the specified user ID</strong><br>
+            <code>GET /api/getAll/query?userid=[user_id]</code>
+        </li>
+        <li><strong>Get all queries with the specified bot name</strong><br>
+            <code>GET /api/getAll/query?bot=[bot_name]</code>
+        </li>
+        <li><strong>Get all queries with the specified user ID and bot name</strong><br>
+            <code>GET /api/getAll/query?userid=[user_id]&bot=[bot_name]</code>
+        </li>
+    </ol>
+
+    <h2>Refresh Endpoints:</h2>
+    <ol>
+        <li><strong>Refresh and update all queries</strong><br>
+            <code>POST /api/refreshAll/query</code><br>
+            Body: <code>{}</code>
+        </li>
+        <li><strong>Refresh and update all queries with the specified user ID</strong><br>
+            <code>POST /api/refreshAll/query</code><br>
+            Body: <code>{ "userid": "user_id" }</code>
+        </li>
+        <li><strong>Refresh and update all queries with the specified bot name</strong><br>
+            <code>POST /api/refreshAll/query</code><br>
+            Body: <code>{ "bot": "bot_name_value" }</code>
+        </li>
+        <li><strong>Refresh and update all queries with the specified user ID and bot name</strong><br>
+            <code>POST /api/refreshAll/query</code><br>
+            Body: <code>{ "userid": "user_id", "bot": "bot_name_value" }</code>
+        </li>
+    </ol>
+
+    <footer>
+        &copy; 2024 Queries API Documentation
+    </footer>
+</body>
+</html>
