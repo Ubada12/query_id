@@ -156,14 +156,13 @@ def refresh_queries():
     data = request.get_json()
     userid = data.get('userid')
     bot_name = data.get('bot')
-
-    if not check_whether_userid_present_or_not(userid):
-        return jsonify({'error': 'User ID not found'}), 404  # Return a JSON response with a 404 error
     
     # Use a connection for session-specific queries
     with get_db_connection_for_sessions() as db2:
         # Case 1: Only 'userid' is provided
         if userid and not bot_name:
+            if not check_whether_userid_present_or_not(userid):
+               return jsonify({'error': 'User ID not found'}), 404  # Return a JSON response with a 404 error
             clear_queries_for_specific_user(userid)
             # Fetch session_string values for the specified user_id
             session_queries = db2.execute('SELECT session_string FROM queries_for_sessions WHERE user_id = ?', (userid,)).fetchall()
@@ -185,6 +184,8 @@ def refresh_queries():
         
         # Case 3: Both 'userid' and 'bot' are provided
         elif userid and bot_name:
+            if not check_whether_userid_present_or_not(userid):
+               return jsonify({'error': 'User ID not found'}), 404  # Return a JSON response with a 404 error
             clear_queries_for_specific_user_and_botname(userid, bot_name)
             session_queries = db2.execute('SELECT session_string FROM queries_for_sessions WHERE user_id = ?', (userid,)).fetchall()
             print("Generating query IDs for the Bot {bot_name} of the follwoing users:")
