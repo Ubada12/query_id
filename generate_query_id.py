@@ -3,6 +3,7 @@ import re
 import sqlite3
 import asyncio
 import signal
+import requests
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from urllib.parse import unquote
@@ -12,6 +13,7 @@ from telethon.types import InputBotAppShortName
 from telethon.sessions import StringSession
 from telethon import functions
 from dotenv import load_dotenv, find_dotenv
+from better_proxy import Proxy
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS
@@ -20,6 +22,7 @@ CORS(app)  # Enable CORS
 api_id = None
 api_hash = None
 usernames = []
+flag_for_proxy_db= False
 
 # Graceful exit on Ctrl+C
 def signal_handler(signal, frame):
@@ -41,6 +44,12 @@ def get_db_connection_for_sessions():
     conn.row_factory = sqlite3.Row  # To return rows as dictionaries
     return conn
 
+# Connect to the database
+def get_db_connection_for_proxy():
+    conn = sqlite3.connect('proxies.db')
+    conn.row_factory = sqlite3.Row  # To return rows as dictionaries
+    return conn
+
 # Create the queries table if it doesn't exist
 def init_db():
     with get_db_connection() as db:
@@ -49,7 +58,8 @@ def init_db():
             user_id INTEGER NOT NULL,
             bot_username TEXT NOT NULL,
             query TEXT NOT NULL,
-            name TEXT NOT NULL
+            name TEXT NOT NULL,
+            proxy TEXT
         )''')
 
 # Create the queries table if it doesn't exist
@@ -59,6 +69,15 @@ def init_db2():
         db2.execute('''CREATE TABLE IF NOT EXISTS queries_for_sessions (
             user_id INTEGER NOT NULL,
             session_string TEXT NOT NULL
+        )''')
+
+# Create the queries table if it doesn't exist
+def init_db3():
+    with get_db_connection_for_proxy() as db3:
+        db3.execute('DROP TABLE IF EXISTS proxies')  # Drop the table if it exists
+        db3.execute('''CREATE TABLE IF NOT EXISTS proxies (
+            session_string TEXT NOT NULL PRIMARY KEY,
+            proxy TEXT
         )''')
 
 # Clear the queries table
@@ -83,10 +102,10 @@ def clear_queries_for_specific_user_and_botname(user_id, bot_name):
         db.commit()
 
 # Insert a new query into the database
-def insert_query(user_id: int, bot_username: str, query: str, name: str):
+def insert_query(user_id: int, bot_username: str, query: str, name: str, proxy: str):
     with get_db_connection() as db:
-        db.execute('INSERT INTO queries (user_id, bot_username, query, name) VALUES (?, ?, ?, ?)',
-                   (user_id, bot_username, query, name))
+        db.execute('INSERT INTO queries (user_id, bot_username, query, name, proxy) VALUES (?, ?, ?, ?, ?)',
+                   (user_id, bot_username, query, name, proxy))
         db.commit()  # Save changes
 
 # Insert a new query into the database
@@ -95,6 +114,12 @@ def insert_query_for_sessions(user_id: int, sessions: str):
         db2.execute('INSERT INTO queries_for_sessions (user_id, session_string) VALUES (?, ?)',
                    (user_id, sessions))
         db2.commit()  # Save changes
+# Insert a new query into the database
+def insert_query_for_proxy(proxy: str, sessions: str):
+    with get_db_connection_for_proxy() as db3:
+        db3.execute('INSERT INTO proxies (session_string, proxy) VALUES (?, ?)',
+                   (sessions, proxy))
+        db3.commit()  # Save changes
 
 def check_whether_userid_present_or_not(userid):
     with get_db_connection_for_sessions() as db2:
@@ -124,12 +149,12 @@ def get_queries():
         if userid and not bot_name:
             if not check_whether_userid_present_or_not(userid):
                 return jsonify({'error': 'User ID not found'}), 404  # Return a JSON response with a 404 error
-            if not check_whether_botname_present_or_not(bot_name):
-                return jsonify({'error': 'Bot Name not found'}), 404  # Return a JSON response with a 404 error
             queries = db.execute('SELECT * FROM queries WHERE user_id = ?', (userid,)).fetchall()
         
         # Case 2: Only 'bot' is provided
         elif bot_name and not userid:
+            if not check_whether_botname_present_or_not(bot_name):
+                return jsonify({'error': 'Bot Name not found'}), 404  # Return a JSON response with a 404 error
             queries = db.execute('SELECT * FROM queries WHERE bot_username = ?', (bot_name,)).fetchall()
         
         # Case 3: Both 'userid' and 'bot' are provided
@@ -156,14 +181,13 @@ def refresh_queries():
     data = request.get_json()
     userid = data.get('userid')
     bot_name = data.get('bot')
-
-    if not check_whether_userid_present_or_not(userid):
-        return jsonify({'error': 'User ID not found'}), 404  # Return a JSON response with a 404 error
     
     # Use a connection for session-specific queries
     with get_db_connection_for_sessions() as db2:
         # Case 1: Only 'userid' is provided
         if userid and not bot_name:
+            if not check_whether_userid_present_or_not(userid):
+               return jsonify({'error': 'User ID not found'}), 404  # Return a JSON response with a 404 error
             clear_queries_for_specific_user(userid)
             # Fetch session_string values for the specified user_id
             session_queries = db2.execute('SELECT session_string FROM queries_for_sessions WHERE user_id = ?', (userid,)).fetchall()
@@ -171,7 +195,8 @@ def refresh_queries():
             for username in usernames:
                 print(f"- {username}")
                 for query in session_queries:
-                    asyncio.run(generate_query(query['session_string'], username))
+                    proxy_value= get_proxy(query['session_string'])
+                    asyncio.run(generate_query(query['session_string'], username, proxy_value))
 
             # Fetch updated queries for the specified user_id
             with get_db_connection() as db:
@@ -185,11 +210,14 @@ def refresh_queries():
         
         # Case 3: Both 'userid' and 'bot' are provided
         elif userid and bot_name:
+            if not check_whether_userid_present_or_not(userid):
+               return jsonify({'error': 'User ID not found'}), 404  # Return a JSON response with a 404 error
             clear_queries_for_specific_user_and_botname(userid, bot_name)
             session_queries = db2.execute('SELECT session_string FROM queries_for_sessions WHERE user_id = ?', (userid,)).fetchall()
             print("Generating query IDs for the Bot {bot_name} of the follwoing users:")
             for query in session_queries:
-                asyncio.run(generate_query(query['session_string'], bot_name))
+                proxy_value= get_proxy(query['session_string'])
+                asyncio.run(generate_query(query['session_string'], bot_name, proxy_value))
             with get_db_connection() as db:
                 queries = db.execute('SELECT * FROM queries WHERE user_id = ? AND bot_username = ?', (userid, bot_name)).fetchall()
         
@@ -223,11 +251,67 @@ def refresh_query_for_bot(bot_name):
         print("Database accessed: queries refreshed")  # Log to console on each access
         return {'queries': [dict(row) for row in queries]}  # Return the queries in the expected format
 
+def validate_proxy(proxy_str: str) -> bool:
+    try:
+        # Parse the proxy using better_proxy
+        proxy = Proxy.from_str(proxy_str)
+        
+        # Set up the requests proxy dictionary
+        proxy_dict = {
+            "http": f"{proxy.protocol}://{proxy.login}:{proxy.password}@{proxy.host}:{proxy.port}",
+            "https": f"{proxy.protocol}://{proxy.login}:{proxy.password}@{proxy.host}:{proxy.port}"
+        }
+        
+        # Test a request through the proxy
+        response = requests.get("https://httpbin.org/ip", proxies=proxy_dict, timeout=10)
+        
+        # Check if we got a successful response
+        if response.status_code == 200:
+            print("Proxy is working!")
+            return True
+        else:
+            print("Proxy failed with status code:", response.status_code)
+            return False
+
+    except requests.exceptions.ProxyError as pe:
+        print(f"Proxy connection error: {pe}")
+        return False
+    except requests.exceptions.Timeout:
+        print("Request timed out while trying to connect through the proxy.")
+        return False
+    except Exception as e:
+        print(f"Proxy validation failed: {e}")
+        return False
+
 # Function to generate query ID for a single session string
-async def generate_query(session: str, bot_username: str):
+async def generate_query(session: str, bot_username: str, proxy=None):
     global api_id, api_hash  # Access the global variables
 
+    if proxy is not None and not validate_proxy(proxy):
+       print(f"Proxy is dead {proxy}")
+       exit(1)
+
+    # Check and parse the proxy if provided
+    if proxy:
+        proxy = Proxy.from_str(proxy)  # Parse the proxy string
+        proxy_string = str(proxy)
+        proxy_dict = dict(
+            proxy_type=proxy.protocol,
+            addr=proxy.host,
+            port=proxy.port,
+            username=proxy.login,
+            password=proxy.password
+        )
+    else:
+        proxy_dict= None
+        proxy_string = None
+
     client = TelegramClient(StringSession(session), api_id, api_hash)
+    if proxy_dict:
+        client.session.proxy = proxy_dict
+        print(f"Using proxy: {proxy}")
+    else:
+        print("No proxy is beign used")
 
     try:
         await client.connect()
@@ -249,15 +333,14 @@ async def generate_query(session: str, bot_username: str):
         query = unquote(webapp_response.url.split("tgWebAppData=")[1].split("&")[0])
         print(f"Successfully Query ID generated for user {name} | Bot: {bot_username} | username: {username}")
         print()
-
-        insert_query(user_id, bot_username, query, name)  # Insert the query into the database
+        insert_query(user_id, bot_username, query, name, proxy_string)  # Insert the query into the database
 
         await client.disconnect()
 
     except FloodWaitError as e:
         print(f"Rate limit encountered. Waiting for {e.seconds} seconds...")
         await asyncio.sleep(e.seconds)  # Wait for the required time
-        return await generate_query(session, bot_username)  # Retry after waiting
+        return await generate_query(session, bot_username, proxy_string)  # Retry after waiting
 
     except Exception as e:
         await client.disconnect()
@@ -266,21 +349,65 @@ async def generate_query(session: str, bot_username: str):
 
 # Function to load session strings from the 'sessions' folder and generate queries
 async def generate_queries_for_all_sessions(bot_username: str):
+    global flag_for_proxy_db
+
     session_folder = 'sessions'
-    
+
+    if not flag_for_proxy_db:
+        proxies = load_proxies("proxies.txt")
+        num_proxies = len(proxies)
+
     if not os.path.exists(session_folder):
         print(f"Error: '{session_folder}' folder not found.")
         return
 
-    for session_file in os.listdir(session_folder):
+    for i, session_file in enumerate(os.listdir(session_folder)):
         if session_file.endswith('.session'):
             session_path = os.path.join(session_folder, session_file)
             print(f"\nProcessing session file: {session_file}")
 
             with open(session_path, 'r') as file:
                 session_string = file.read().strip()
+                
 
-            await generate_query(session_string, bot_username)
+                if not flag_for_proxy_db:
+                    # Use the proxy based on the index of the current session
+                    if i < num_proxies:
+                        proxy = proxies[i]  # Use the corresponding proxy
+                    else:
+                        proxy = None  # No more proxies available
+                    insert_query_for_proxy(proxy, session_string)
+
+            proxy_value= get_proxy(session_string)
+            await generate_query(session_string, bot_username, proxy_value)
+
+    flag_for_proxy_db = True
+
+def get_proxy(session: str):
+    with get_db_connection_for_proxy() as db3:
+        queries = db3.execute('SELECT proxy FROM proxies WHERE session_string = ?', (session,)).fetchall()
+        # Return the proxy if found, otherwise return None
+        if queries:
+            return queries[0][0]
+        else:
+            print("Session string not found in our database")
+            exit(1)
+
+def load_proxies(file_path):
+    # Validate the existence of the file
+    if not os.path.exists(file_path):
+        print(f"Error: The file '{file_path}' does not exist.")
+        exit(1)
+
+    # Read the file and store proxies in a list
+    with open(file_path, 'r') as file:
+        proxies = [line.strip() for line in file if line.strip()]  # Strip whitespace and filter out empty lines
+
+    # Check if the file is empty
+    if not proxies:
+        print(f"Warning: The file '{file_path}' is empty.")
+    
+    return proxies
 
 # Example usage
 if __name__ == '__main__':
@@ -317,6 +444,7 @@ if __name__ == '__main__':
     
     init_db()  # Initialize the database once at startup
     init_db2()
+    init_db3()
     print("Generating query IDs for the following usernames:")
     for username in usernames:
         print(f"- {username}")
