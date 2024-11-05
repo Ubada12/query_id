@@ -32,21 +32,30 @@ def create_session():
 def main():
     while True:
         display_menu()
-        choice = input("Enter your choice: ").strip()
-        
-        if choice == "1":
-            # Check if the sessions folder exists
-            if not os.path.exists('sessions'):
-                print("Error: 'sessions' folder not found. Please create it before proceeding.")
-                continue  # Go back to the menu
-            generate_query_id()
-        elif choice == "2":
-            create_session()
-        elif choice == "0":
-            print("Exiting...")
+        try:
+            choice = input("Enter your choice: ").strip()
+            
+            if choice == "1":
+                # Check if the sessions folder exists
+                if not os.path.exists('sessions'):
+                    print("Error: 'sessions' folder not found. Please create it before proceeding.")
+                    continue  # Go back to the menu
+                generate_query_id()
+            elif choice == "2":
+                create_session()
+            elif choice == "0":
+                print("Exiting...")
+                break
+            else:
+                print("Invalid choice, please select again.")
+        except EOFError:
+            print()
+            print("No input received. Exiting the program.")
+            break  # Exit the loop if no input is received
+        except KeyboardInterrupt:
+            print()
+            print("Process interrupted by user.")
             break
-        else:
-            print("Invalid choice, please select again.")
 
 if __name__ == "__main__":
     main()

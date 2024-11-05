@@ -3,6 +3,7 @@ import re
 import sqlite3
 import asyncio
 import signal
+import random
 import requests
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
@@ -194,9 +195,8 @@ def refresh_queries():
             print("Generating query IDs for the following usernames:")
             for username in usernames:
                 print(f"- {username}")
-                for query in session_queries:
-                    proxy_value= get_proxy(query['session_string'])
-                    asyncio.run(generate_query(query['session_string'], username, proxy_value))
+                proxy_value= get_proxy(session_queries[0][0])
+                asyncio.run(generate_query(session_queries[0][0], username, proxy_value))
 
             # Fetch updated queries for the specified user_id
             with get_db_connection() as db:
@@ -214,10 +214,9 @@ def refresh_queries():
                return jsonify({'error': 'User ID not found'}), 404  # Return a JSON response with a 404 error
             clear_queries_for_specific_user_and_botname(userid, bot_name)
             session_queries = db2.execute('SELECT session_string FROM queries_for_sessions WHERE user_id = ?', (userid,)).fetchall()
-            print("Generating query IDs for the Bot {bot_name} of the follwoing users:")
-            for query in session_queries:
-                proxy_value= get_proxy(query['session_string'])
-                asyncio.run(generate_query(query['session_string'], bot_name, proxy_value))
+            print(f"Generating query IDs for the Bot {bot_name} of the user {userid}:")
+            proxy_value= get_proxy(session_queries[0][0])
+            asyncio.run(generate_query(session_queries[0][0], bot_name, proxy_value))
             with get_db_connection() as db:
                 queries = db.execute('SELECT * FROM queries WHERE user_id = ? AND bot_username = ?', (userid, bot_name)).fetchall()
         
@@ -331,15 +330,16 @@ async def generate_query(session: str, bot_username: str, proxy=None):
 
         # Parse query data from the URL
         query = unquote(webapp_response.url.split("tgWebAppData=")[1].split("&")[0])
-        print(f"Successfully Query ID generated for user {name} | Bot: {bot_username} | username: {username}")
+        print(f"Successfully Query ID generated for user {name} | Bot: {bot_username} | username: {me.username}")
         print()
         insert_query(user_id, bot_username, query, name, proxy_string)  # Insert the query into the database
 
         await client.disconnect()
 
     except FloodWaitError as e:
+        wait_time = e.seconds + random.uniform(10, 30)  # Add a small random jitter to avoid precise retry timings
         print(f"Rate limit encountered. Waiting for {e.seconds} seconds...")
-        await asyncio.sleep(e.seconds)  # Wait for the required time
+        await asyncio.sleep(wait_time)  # Wait for the required time
         return await generate_query(session, bot_username, proxy_string)  # Retry after waiting
 
     except Exception as e:
@@ -448,7 +448,15 @@ if __name__ == '__main__':
     print("Generating query IDs for the following usernames:")
     for username in usernames:
         print(f"- {username}")
-        asyncio.run(generate_queries_for_all_sessions(username))
+        try:
+           asyncio.run(generate_queries_for_all_sessions(username))
+        except KeyboardInterrupt:
+           print("Process interrupted by user. Exiting gracefully...")
+        except RuntimeError as e:
+           if 'Event loop stopped before Future completed' in str(e):
+               print("Warning: The event loop was stopped before all tasks were completed. Exiting gracefully...")
+           else:
+               print(f"Unexpected runtime error: {e}")
     
     print("head over to the site http://127.0.0.1:3000 to read the api docs")
     app.run(port=3000)
