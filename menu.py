@@ -11,7 +11,7 @@ def display_menu():
 def generate_query_id():
     # Run another Python script using subprocess
     try:
-        subprocess.run(["python", "generate_query_id.py"], check=True)
+        subprocess.run(["python3", "generate_query_id.py"], check=True)
     except FileNotFoundError:
         print("Error: The file 'generate_query_id.py' was not found.")
     except KeyboardInterrupt:
@@ -23,7 +23,7 @@ def create_session():
     # Run another Python script using subprocess
     print("Creating session...")
     try:
-        subprocess.run(["python", "generate_session_strg.py"], check=True)
+        subprocess.run(["python3", "generate_session_strg.py"], check=True)
     except FileNotFoundError:
         print("Error: The file 'generate_session_strg.py' was not found.")
     except Exception as e:
