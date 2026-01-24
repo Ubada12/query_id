@@ -105,7 +105,16 @@ The following table maps internally used **Special Types** to standardized SUBTY
 | Unresolved (neg → sp6) | hdn             | Mixed (Day–Night)        | Ambiguous negative samples extracted from mixed pools; may contain humans, animals, clutter, or partial goat-like patterns |
 | Unresolved (pos → sp1) | nrm             | Mixed (Day–Night)        | Valid positive goat samples with mixed lighting and background conditions; exact scene subtype not explicitly separated    |
 
-This mapping ensures consistency while preserving historical annotations.
+This mapping ensures consistency while preserving historical annotations. 
+
+### Unresolved Samples
+
+Some samples are marked as **unresolved** due to mixed acquisition sources or lack of deterministic separation during collection.
+
+* **Unresolved negatives** are conservatively treated as **hard negatives (`hdn`)** and are explicitly flagged in metadata notes for future refinement.
+* **Unresolved positives** represent valid goat detections under mixed lighting and background conditions and are intentionally kept unsplit.
+
+These samples are clearly marked in the `notes` column to enable targeted review, reclassification, or renaming in future dataset iterations.
 
 ---
 
