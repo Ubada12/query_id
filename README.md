@@ -78,7 +78,7 @@ These TYPE definitions apply to **both positive and negative images**.
 | SUBTYPE | Meaning                                                       |
 | ------- | ------------------------------------------------------------- |
 | nrm     | Normal conditions                                             |
-| emp     | Empty chute (no goats)                                        |
+| emp     | Empty chute (no goats) with humans passing normal events      |
 | hdn     | Hard negatives (humans, other animals, ambiguous clutter)     |
 | brk     | Broken or unstable camera (shake, occlusion, mounting issues) |
 | ngt     | Night or low-light conditions                                 |
