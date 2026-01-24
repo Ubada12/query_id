@@ -92,16 +92,16 @@ These TYPE definitions apply to **both positive and negative images**.
 
 The following table maps internally used **Special Types** to standardized SUBTYPE codes.
 
-| Special Type | Maps to SUBTYPE | Description                                    |
-| ------------ | --------------- | ---------------------------------------------- |
-| Special 1    | nrm             | Normal afternoon conditions, humans passing    |
-| Special 2    | shd             | Sharp sunlight with strong shadows             |
-| Special 3    | clt             | Heavy clutter, garbage, bamboo shadows         |
-| Special 4    | clt             | Similar to Special 3, later evening conditions |
-| Special 5    | rot             | Camera temporarily rotated                     |
-| Special 6    | hdn             | Other animals, humans, ambiguous objects       |
-| Special 7    | brk             | Shaky camera, mounting issues, hand occlusion  |
-| Special 8    | ngt             | Night-time with artificial lighting            |
+| Special Type | Maps to SUBTYPE |  Time of Day             | Description                                         |
+| ------------ | --------------- | ------------------------ | --------------------------------------------------- |
+| Special 1    | nrm             | Afternoon                | Normal afternoon conditions, humans passing         |
+| Special 2    | shd             | Border Afternoon–Evening | Sharp sunlight with strong shadows                  |
+| Special 3    | clt             | Evening                  | Heavy clutter, garbage, bamboo shadows              |
+| Special 4    | clt             | Evening (Late)           | Similar to Special 3, later evening conditions      |
+| Special 5    | rot             | Night (Early)            | Camera temporarily rotated, artificial lights begin |
+| Special 6    | hdn             | Border Afternoon–Evening | Other animals, humans, ambiguous objects            |
+| Special 7    | brk             | Afternoon                | Shaky camera, mounting issues, hand occlusion       |
+| Special 8    | ngt             | Night                    | Night-time with artificial lighting                 |
 
 This mapping ensures consistency while preserving historical annotations.
 
