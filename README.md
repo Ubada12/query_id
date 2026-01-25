@@ -1,14 +1,115 @@
-# Dataset Documentation
+# 📄 Dataset Documentation — Goat Detection (YOLO, Single Class)
 
 ## 1. Dataset Overview
 
-This dataset is built for training a **YOLO-based single-class object detector** to detect **goats in a farm chute** using CCTV cameras.
+This dataset is built for training a **YOLO-based single-class object detector** to detect **goats in a farm chute** using CCTV camera feeds.
 
-The dataset contains both **positive and negative samples** across multiple camera views, orientations, lighting conditions, and environmental variations. It is intentionally designed to reduce **false positives and hallucinations** in real-world, continuous CCTV deployment rather than focusing only on benchmark performance.
+The dataset contains both **positive (goat present)** and **negative (no goat present)** samples collected across:
+
+* Multiple camera mountings and orientations
+* Different chute layouts and structural materials
+* Varying lighting conditions (day, evening, night, artificial light)
+* Real farm activity (humans, animals, clutter, motion, camera shake)
+
+The dataset is intentionally designed to **minimize false positives and hallucinations** in continuous, real-world CCTV deployments, rather than only optimizing benchmark mAP scores.
 
 ---
 
-## 2. Filename Convention
+## 2. End-to-End Dataset Pipeline (Phase 0 → Phase 3)
+
+This dataset was constructed using a strict **multi-phase pipeline** to ensure correctness, reproducibility, and robustness.
+
+### Phase 0 — Raw Collection
+
+* Frames extracted from real CCTV footage
+* Multiple camera views, rotations, and environmental conditions
+* No assumptions about cleanliness or balance
+
+### Phase 1 — Dataset Staging
+
+Raw data grouped into staging folders by:
+
+* Dataset version (`v1`, `v2`)
+* Positive / Negative samples
+* Camera type (`t1–t4`)
+* Scene subtype (`nrm`, `hdn`, `clt`, etc.)
+
+No renaming is performed at this stage; the focus is **logical grouping only**.
+
+### Phase 2 — Metadata Generation
+
+A metadata **CSV** is generated from the staging structure.
+
+Each row represents **one image–label pair**.
+
+Metadata fields include:
+
+* Split, label, dataset version
+* Camera type, scene subtype
+* Time-of-day, lighting conditions
+* Notes (including unresolved flags)
+
+### Phase 2.5 — Dataset Gatekeeper Validation
+
+A production-grade validation pass enforces:
+
+* No corrupted images
+* Exact image–label pairing
+* Correct YOLO label format
+* Strict positive / negative semantics
+* Single-class enforcement (`class_id = 0`)
+* No train / validation leakage
+* Verified counts and proportions
+
+❗ **Training is blocked if Phase 2.5 fails**
+
+### Phase 3 — Final YOLO Dataset Export (Locked)
+
+* Dataset flattened into YOLO-readable structure
+* Explicit `train.txt` and `val.txt` generated
+* Final `data.yaml` defines the dataset contract
+
+From this point onward, the dataset is **immutable**.
+
+---
+
+## 3. Final YOLO Dataset Structure
+
+```
+dataset_yolo_final/
+├── images/
+│   ├── train/
+│   │   └── *.jpg
+│   └── val/
+│       └── *.jpg
+│
+├── labels/
+│   ├── train/
+│   │   └── *.txt
+│   └── val/
+│       └── *.txt
+│
+├── train.txt
+├── val.txt
+├── data.yaml
+└── README.md
+```
+
+YOLO only reads:
+
+* `data.yaml`
+* `train.txt`
+* `val.txt`
+
+Labels are resolved automatically by YOLO via path substitution:
+
+```
+images/.../X.jpg → labels/.../X.txt
+```
+
+---
+
+## 4. Filename Convention
 
 All images follow a single, consistent naming format:
 
@@ -18,128 +119,141 @@ All images follow a single, consistent naming format:
 
 ### Field Definitions
 
-| Field   | Description                                      |
-| ------- | ------------------------------------------------ |
-| SPLIT   | Dataset split identifier (training / validation) |
-| LABEL   | Presence or absence of goat in the frame         |
-| DS      | Dataset version                                  |
-| TYPE    | Camera or view type                              |
-| SUBTYPE | Scene or condition subtype                       |
-| SEQ     | Zero-padded sequential number                    |
+| Field   | Description                                        |
+| ------- | -------------------------------------------------- |
+| SPLIT   | Dataset split (`tr` = training, `va` = validation) |
+| LABEL   | `pos` (goat present) or `neg` (no goat)            |
+| DS      | Dataset version (`v1`, `v2`, …)                    |
+| TYPE    | Camera / view type                                 |
+| SUBTYPE | Scene or condition subtype                         |
+| SEQ     | Zero-padded sequential identifier (`%06d`)         |
+
+This naming is **semantic for humans** but ignored by YOLO during training.
 
 ---
 
-## 3. SPLIT Definitions
+## 5. SPLIT Definitions
 
 | Code | Meaning          |
 | ---- | ---------------- |
 | tr   | Training split   |
 | va   | Validation split |
 
----
-
-## 4. LABEL Definitions
-
-| Code | Meaning                                           |
-| ---- | ------------------------------------------------- |
-| pos  | Goat present (at least one goat visible in frame) |
-| neg  | No goat present                                   |
+Train / validation split is approximately **70 / 30**, with matched positive–negative ratios.
 
 ---
 
-## 5. Dataset Versions (DS)
+## 6. LABEL Definitions
 
-| Code | Meaning                                                                        |
-| ---- | ------------------------------------------------------------------------------ |
-| v1   | Initial dataset with earlier camera setups and limited views                   |
-| v2   | Extended dataset with additional views, orientations, and hard-negative mining |
-
-Future versions (v3, v4, …) can be added without breaking compatibility.
+| Code | Meaning                                |
+| ---- | -------------------------------------- |
+| pos  | At least one goat visible in the frame |
+| neg  | No goat present                        |
 
 ---
 
-## 6. TYPE Definitions (Camera / View Types)
+## 7. Dataset Versions (DS)
 
-| TYPE | Description                                                                                      |
-| ---- | ------------------------------------------------------------------------------------------------ |
-| t1   | Ceiling-mounted camera (~45° angle), full farm visible, ROI cropped to chute area                |
-| t2   | Top-down vertical view (90°), chute only, short entry–exit distance                              |
-| t3   | Top-down camera rotated horizontally; goats move left ↔ right, extended chute using bamboo sides |
-| t4   | Same as t3 but with complex backgrounds: sunrise, evening, night lighting, shadows, clutter      |
+| Code | Description                                                             |
+| ---- | ----------------------------------------------------------------------- |
+| v1   | Initial dataset with earlier camera setups and limited viewpoints       |
+| v2   | Expanded dataset with new views, orientations, and hard-negative mining |
 
-These TYPE definitions apply to **both positive and negative images**.
+Future versions (`v3`, `v4`, …) can be added without breaking compatibility.
 
 ---
 
-## 7. SUBTYPE Definitions (Scene / Condition Types)
+## 8. TYPE Definitions (Camera / View Types)
 
-### Core Subtypes
+| TYPE | Description                                                                                     |
+| ---- | ----------------------------------------------------------------------------------------------- |
+| t1   | Ceiling-mounted camera (~45°), full farm visible, ROI cropped to chute                          |
+| t2   | Top-down vertical view (90°), chute only, short entry–exit distance                             |
+| t3   | Top-down camera rotated horizontally; goats move left ↔ right, extended chute with bamboo sides |
+| t4   | Same as `t3` with complex backgrounds: sunrise, evening, night lighting, shadows, heavy clutter |
 
-| SUBTYPE | Meaning                                                       |
-| ------- | ------------------------------------------------------------- |
-| nrm     | Normal conditions                                             |
-| emp     | Empty chute (no goats) with humans passing normal events      |
-| hdn     | Hard negatives (humans, other animals, ambiguous clutter)     |
-| brk     | Broken or unstable camera (shake, occlusion, mounting issues) |
-| ngt     | Night or low-light conditions                                 |
-| rot     | Temporary camera rotation                                     |
-| shd     | Strong shadows                                                |
-| clt     | Heavy clutter, garbage, goat hair, bamboo shadows             |
+TYPE applies to **both positive and negative samples**.
 
 ---
 
-## 8. Mapping to Special Types
+## 9. SUBTYPE Definitions (Scene / Condition Types)
 
-The following table maps internally used **Special Types** to standardized SUBTYPE codes.
-
- Special Type           | Maps to SUBTYPE | Time of Day              | Description                                                                                                                |
-| ---------------------- | --------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| Special 1              | nrm             | Afternoon                | Normal afternoon conditions, humans passing                                                                                |
-| Special 2              | shd             | Border Afternoon–Evening | Sharp sunlight with strong shadows                                                                                         |
-| Special 3              | clt             | Evening                  | Heavy clutter, garbage, bamboo shadows                                                                                     |
-| Special 4              | clt             | Evening (Late)           | Similar to Special 3, later evening conditions                                                                             |
-| Special 5              | rot             | Night (Early)            | Camera temporarily rotated, artificial lights begin                                                                        |
-| Special 6              | hdn             | Border Afternoon–Evening | Other animals, humans, ambiguous objects                                                                                   |
-| Special 7              | brk             | Afternoon                | Shaky camera, mounting issues, hand occlusion                                                                              |
-| Special 8              | ngt             | Night                    | Night-time with artificial lighting                                                                                        |
-| Unresolved (neg → sp6) | hdn             | Mixed (Day–Night)        | Ambiguous negative samples extracted from mixed pools; may contain humans, animals, clutter, or partial goat-like patterns |
-| Unresolved (pos → sp1) | nrm             | Mixed (Day–Night)        | Valid positive goat samples with mixed lighting and background conditions; exact scene subtype not explicitly separated    |
-
-This mapping ensures consistency while preserving historical annotations. 
-
-### Unresolved Samples
-
-Some samples are marked as **unresolved** due to mixed acquisition sources or lack of deterministic separation during collection.
-
-* **Unresolved negatives** are conservatively treated as **hard negatives (`hdn`)** and are explicitly flagged in metadata notes for future refinement.
-* **Unresolved positives** represent valid goat detections under mixed lighting and background conditions and are intentionally kept unsplit.
-
-These samples are clearly marked in the `notes` column to enable targeted review, reclassification, or renaming in future dataset iterations.
+| SUBTYPE | Description                                              |
+| ------- | -------------------------------------------------------- |
+| nrm     | Normal conditions                                        |
+| emp     | Empty chute, no goats                                    |
+| hdn     | Hard negatives (humans, other animals, ambiguous shapes) |
+| brk     | Camera shake, mounting issues, hand occlusion            |
+| ngt     | Night or low-light scenes with artificial lighting       |
+| rot     | Temporary camera rotation                                |
+| shd     | Strong sunlight and shadows                              |
+| clt     | Heavy clutter: garbage, goat hair, bamboo shadows        |
 
 ---
 
-## 9. Labeling Rules (YOLO Format)
+## 10. Mapping to Historical Special Types
+
+| Special Type     | SUBTYPE | Time of Day              | Description                                                                    |
+| ---------------- | ------- | ------------------------ | ------------------------------------------------------------------------------ |
+| Special 1        | nrm     | Afternoon                | Normal afternoon conditions, humans passing                                    |
+| Special 2        | shd     | Border Afternoon–Evening | Sharp sunlight with strong shadows                                             |
+| Special 3        | clt     | Evening                  | Heavy clutter, garbage, bamboo shadows                                         |
+| Special 4        | clt     | Late Evening             | Similar to Special 3 with reduced lighting                                     |
+| Special 5        | rot     | Early Night              | Camera temporarily rotated, artificial lights begin                            |
+| Special 6        | hdn     | Border Afternoon–Evening | Humans, animals, ambiguous objects                                             |
+| Special 7        | brk     | Afternoon                | Shaky camera, mounting issues, hand occlusion                                  |
+| Special 8        | ngt     | Night                    | Night-time with artificial lighting                                            |
+| Unresolved (neg) | hdn     | Mixed                    | Ambiguous negatives from mixed pools, conservatively treated as hard negatives |
+| Unresolved (pos) | nrm     | Mixed                    | Valid goat positives with mixed lighting and background conditions             |
+
+Unresolved samples are explicitly preserved and flagged for future refinement.
+
+---
+
+## 11. Labeling Rules (YOLO Format)
 
 ### Positive Images
 
 * Must have a corresponding `.txt` file
-* Bounding boxes follow standard YOLO format
+* Each line follows:
+
+```
+class_id x_center y_center width height
+```
+
+* Single-class only (`class_id = 0`)
 
 ### Negative Images
 
-* Either:
-
-  * An empty `.txt` file, or
-  * No `.txt` file at all (depending on training pipeline configuration)
-
-No bounding boxes should exist for negative samples.
+* `.txt` file **must exist** and be completely empty
+* No whitespace, no bounding boxes
 
 ---
 
-## 10. Design Philosophy
+## 12. Dataset Statistics (Final)
 
-This dataset intentionally prioritizes **camera-matched negatives**, **hard negatives**, and **environmental diversity** over generic object images.
+* **Total images:** 23,976
+* **Total positives:** 17,981
+* **Total negatives:** 5,996
 
-The primary goal is to **minimize false positives and hallucinations** during long-running CCTV deployments rather than solely maximizing benchmark mAP scores.
+**Split distribution:**
 
-This design choice ensures robustness, stability, and real-world reliability.
+* Train ≈ 70%
+* Validation ≈ 30%
+
+**Positive : Negative ≈ 3 : 1**
+
+---
+
+## 13. Design Philosophy
+
+This dataset intentionally prioritizes:
+
+* Camera-matched negatives
+* Hard negatives
+* Environmental realism
+* Viewpoint diversity
+
+Over generic object images.
+
+The primary goal is **robust real-world performance** with minimal hallucinations during long-running CCTV inference, not merely high benchmark scores.
